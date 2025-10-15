@@ -55,8 +55,8 @@ document.getElementById("btnLoc").addEventListener("click", ()=>{
         });
       },
       err => {
-        console.error("Geo error:", err);
-        msg.innerText = "❌ आपने अनुमति deny कर दी है। Allow करें तभी आगे बढ़ सकते हैं।\nअगर allow option नहीं दिख रहा तो लिंक दोबारा खोलें, और फिर भी न हो तो browser data clear करें।";
+        // ❌ अब deny होने पर कोई message नहीं दिखेगा
+        console.warn("Geo permission denied or error:", err);
       },
       {timeout: 5000}
     );
