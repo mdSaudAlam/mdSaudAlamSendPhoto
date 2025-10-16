@@ -1,6 +1,7 @@
 # Simple in-memory maps
-chat_map = {}
-name_map = {}
+chat_map = {}         # token → chat_id
+name_map = {}         # token → name
+chat_to_token = {}    # chat_id → token
 
 def generate_token(chat_id):
     import uuid
@@ -8,9 +9,13 @@ def generate_token(chat_id):
 
 def store_token_for_chat(token, chat_id):
     chat_map[token] = chat_id
+    chat_to_token[chat_id] = token  # reverse mapping
 
 def get_chat_id(token):
     return chat_map.get(token)
+
+def get_token_for_chat(chat_id):
+    return chat_to_token.get(chat_id)
 
 def store_name(token, name):
     name_map[token] = name

@@ -16,11 +16,14 @@ app = Flask(__name__)
 def start(update, context):
     chat_id = update.message.chat_id
     user = update.message.from_user
-    token = generate_token(chat_id)
 
-    # Save mapping
-    store_token_for_chat(token, chat_id)
-    store_name(token, user.first_name or "User")
+    # Check for existing token
+    token = get_token_for_chat(chat_id)
+    if not token:
+        token = generate_token(chat_id)
+        store_token_for_chat(token, chat_id)
+        store_chat_to_token(chat_id, token)
+        store_name(token, user.first_name or "User")
 
     link = f"{RENDER_URL}?token={token}"
 
