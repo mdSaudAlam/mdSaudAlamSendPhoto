@@ -17,6 +17,9 @@ def get_chat_id(token):
 def get_token_for_chat(chat_id):
     return chat_to_token.get(chat_id)
 
+def store_chat_to_token(chat_id, token):
+    chat_to_token[chat_id] = token
+
 def store_name(token, name):
     name_map[token] = name
 

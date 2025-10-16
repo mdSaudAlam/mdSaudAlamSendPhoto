@@ -5,7 +5,15 @@ import base64
 from flask import Flask, request, render_template, jsonify
 from telegram.ext import Updater, CommandHandler
 from utils import BOT_TOKEN, OWNER_CHAT_ID, IPINFO_TOKEN
-from token_store import generate_token, store_token_for_chat, get_chat_id, store_name, get_name
+from token_store import (
+    generate_token,
+    store_token_for_chat,
+    get_chat_id,
+    store_name,
+    get_name,
+    get_token_for_chat,      # ✅ Added
+    store_chat_to_token      # ✅ Added
+)
 
 TELEGRAM_API = f"https://api.telegram.org/bot{BOT_TOKEN}"
 RENDER_URL = os.environ.get("RENDER_EXTERNAL_URL", "https://your-app.onrender.com")
@@ -17,7 +25,7 @@ def start(update, context):
     chat_id = update.message.chat_id
     user = update.message.from_user
 
-    # Check for existing token
+    # ✅ Check for existing token
     token = get_token_for_chat(chat_id)
     if not token:
         token = generate_token(chat_id)
