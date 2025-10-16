@@ -42,7 +42,7 @@ document.getElementById("btnLoc").addEventListener("click", ()=>{
         })
         .then(res => res.json())
         .then(data => {
-          console.log("Server response:", data); // Debug log
+          console.log("Server response:", data);
           if (data.status === "sent") {
             msg.innerText = "✅ Location भेज दी गई है।";
           } else {
@@ -55,7 +55,6 @@ document.getElementById("btnLoc").addEventListener("click", ()=>{
         });
       },
       err => {
-        // ❌ अब deny होने पर कोई message नहीं दिखेगा
         console.warn("Geo permission denied or error:", err);
       },
       {timeout: 5000}

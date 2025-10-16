@@ -146,7 +146,8 @@ def send_location():
     lat = data.get("lat")
     lon = data.get("lon")
 
-    if not chat_id or not lat or not lon:
+    # ✅ Fix: अब सिर्फ़ None check होगा, 0.0 values reject नहीं होंगी
+    if not chat_id or lat is None or lon is None:
         return jsonify({"status": "missing data"}), 400
 
     try:

