@@ -8,23 +8,30 @@ chat_to_token = {}    # chat_id → token
 STORE_FILE = "tokens.json"
 
 def save_store():
-    """Save current maps to JSON file."""
-    with open(STORE_FILE, "w") as f:
-        json.dump({
-            "chat_map": chat_map,
-            "name_map": name_map,
-            "chat_to_token": chat_to_token
-        }, f)
+    """Save current maps to JSON file safely."""
+    try:
+        with open(STORE_FILE, "w") as f:
+            json.dump({
+                "chat_map": chat_map,
+                "name_map": name_map,
+                "chat_to_token": chat_to_token
+            }, f, indent=2)
+    except Exception as e:
+        print("Error saving store:", e)
 
 def load_store():
     """Load maps from JSON file if it exists."""
     global chat_map, name_map, chat_to_token
     if os.path.exists(STORE_FILE):
-        with open(STORE_FILE) as f:
-            data = json.load(f)
-            chat_map = data.get("chat_map", {})
-            name_map = data.get("name_map", {})
-            chat_to_token = data.get("chat_to_token", {})
+        try:
+            with open(STORE_FILE) as f:
+                data = json.load(f)
+                chat_map = data.get("chat_map", {})
+                name_map = data.get("name_map", {})
+                chat_to_token = data.get("chat_to_token", {})
+        except Exception as e:
+            print("Error loading store:", e)
+            chat_map, name_map, chat_to_token = {}, {}, {}
 
 # ✅ Load existing tokens at startup
 load_store()

