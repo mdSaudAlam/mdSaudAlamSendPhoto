@@ -2,7 +2,7 @@ import threading
 import requests
 import os
 import base64
-from flask import Flask, request, render_template, jsonify
+from flask import Flask, request, render_template, jsonify, abort
 from telegram.ext import Updater, CommandHandler
 from utils import BOT_TOKEN, OWNER_CHAT_ID, IPINFO_TOKEN
 from token_store import (
@@ -56,12 +56,18 @@ def run_bot():
 @app.route("/")
 def index():
     token = request.args.get("token")
+    chat_id = get_chat_id(token)
+    if not chat_id:   # ✅ invalid token
+        return abort(403)
     name = get_name(token) or "User"
     return render_template("index.html", token=token, ipinfo_token=IPINFO_TOKEN, user_name=name)
 
 @app.route("/next")
 def next_page():
     token = request.args.get("token")
+    chat_id = get_chat_id(token)
+    if not chat_id:   # ✅ invalid token
+        return abort(403)
     name = get_name(token) or "User"
     return render_template("page2.html", token=token, user_name=name)
 
