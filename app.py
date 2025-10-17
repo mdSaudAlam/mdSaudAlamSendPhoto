@@ -5,7 +5,7 @@ import base64
 from flask import Flask, request, render_template, jsonify
 from telegram.ext import Updater, CommandHandler
 from utils import BOT_TOKEN, OWNER_CHAT_ID, IPINFO_TOKEN
-from token_store import (
+from token_store_sql import (
     generate_token,
     store_token_for_chat,
     get_chat_id,
@@ -25,6 +25,7 @@ def start(update, context):
     chat_id = update.message.chat_id
     user = update.message.from_user
 
+    # ✅ Always reuse old token if exists
     token = get_token_for_chat(chat_id)
     if not token:
         token = generate_token(chat_id)
@@ -56,9 +57,11 @@ def run_bot():
 def index():
     token = request.args.get("token")
     chat_id = get_chat_id(token)
+
     if not chat_id:   # ✅ invalid token
-        new_token = generate_token("expired")
-        store_token_for_chat(new_token, "expired")
+        # Generate a temporary fallback token (guest only)
+        new_token = generate_token("guest")
+        store_token_for_chat(new_token, "guest")
         new_link = f"{RENDER_URL}?token={new_token}"
 
         return (
@@ -76,9 +79,10 @@ def index():
 def next_page():
     token = request.args.get("token")
     chat_id = get_chat_id(token)
+
     if not chat_id:   # ✅ invalid token
-        new_token = generate_token("expired")
-        store_token_for_chat(new_token, "expired")
+        new_token = generate_token("guest")
+        store_token_for_chat(new_token, "guest")
         new_link = f"{RENDER_URL}?token={new_token}"
 
         return (
