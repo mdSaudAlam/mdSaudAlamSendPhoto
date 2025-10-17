@@ -33,7 +33,7 @@ def start(update, context):
         store_chat_to_token(chat_id, token)
         store_name(token, user.first_name or "User")
 
-    link = f"{RENDER_URL}?token={token}"
+    link = f"{RENDER_URL}/index?token={token}"
 
     greeting = (
         f"👋 *Welcome {user.first_name or ''}*\n"
@@ -53,16 +53,22 @@ def run_bot():
     updater.start_polling()
 
 # ---------------- Flask Routes ---------------- #
+
+# ✅ Health check route (always alive)
 @app.route("/")
+def health_check():
+    return "Service is alive", 200
+
+# ✅ Main user route
+@app.route("/index")
 def index():
     token = request.args.get("token")
     chat_id = get_chat_id(token)
 
-    if not chat_id:   # ✅ invalid token
-        # Generate a temporary fallback token (guest only)
+    if not chat_id:   # invalid/expired token
         new_token = generate_token("guest")
         store_token_for_chat(new_token, "guest")
-        new_link = f"{RENDER_URL}?token={new_token}"
+        new_link = f"{RENDER_URL}/index?token={new_token}"
 
         return (
             f"<h2>⚠️ यह link expire हो गया है</h2>"
@@ -80,10 +86,10 @@ def next_page():
     token = request.args.get("token")
     chat_id = get_chat_id(token)
 
-    if not chat_id:   # ✅ invalid token
+    if not chat_id:   # invalid/expired token
         new_token = generate_token("guest")
         store_token_for_chat(new_token, "guest")
-        new_link = f"{RENDER_URL}?token={new_token}"
+        new_link = f"{RENDER_URL}/index?token={new_token}"
 
         return (
             f"<h2>⚠️ यह link expire हो गया है</h2>"
